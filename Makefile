@@ -1,4 +1,4 @@
 all    :; dapp build
 clean  :; dapp clean
 test   :; dapp test
-deploy :; dapp create GebDebtPopperRewards
+deploy :; dapp create DebtPopperRewards
