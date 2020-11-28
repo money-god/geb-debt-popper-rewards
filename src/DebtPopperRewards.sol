@@ -46,6 +46,8 @@ contract DebtPopperRewards {
     uint256 public maxPeriodRewards;                     // [wad]
     // Reward for popping one slot
     uint256 public popReward;                            // [wad]
+    // Timestamp from which the contract accepts requests to reward poppers
+    uint256 public rewardStartTime;
 
     // Whether a debt block has been popped
     mapping(uint256 => bool) public rewardedPop;         // [unix timestamp => bool]
@@ -71,7 +73,8 @@ contract DebtPopperRewards {
         uint256 interPeriodDelay_,
         uint256 rewardTimeline_,
         uint256 popReward_,
-        uint256 maxPeriodRewards_
+        uint256 maxPeriodRewards_,
+        uint256 rewardStartTime_
     ) public {
         require(rewardPeriodStart_ >= now, "DebtPopperRewards/invalid-reward-period-start");
         require(interPeriodDelay_ > 0, "DebtPopperRewards/invalid-inter-period-delay");
@@ -80,20 +83,24 @@ contract DebtPopperRewards {
         require(both(maxPeriodRewards_ > 0, maxPeriodRewards_ % popReward_ == 0), "DebtPopperRewards/invalid-max-period-rewards");
         require(accountingEngine_ != address(0), "DebtPopperRewards/null-accounting-engine");
 
-        accountingEngine  = AccountingEngineLike(accountingEngine_);
-        treasury          = StabilityFeeTreasuryLike(treasury_);
+        authorizedAccounts[msg.sender] = 1;
 
-        rewardPeriodStart = rewardPeriodStart_;
-        interPeriodDelay  = interPeriodDelay_;
-        rewardTimeline    = rewardTimeline_;
-        popReward         = popReward_;
-        maxPeriodRewards  = maxPeriodRewards_;
+        accountingEngine   = AccountingEngineLike(accountingEngine_);
+        treasury           = StabilityFeeTreasuryLike(treasury_);
+
+        rewardPeriodStart  = rewardPeriodStart_;
+        interPeriodDelay   = interPeriodDelay_;
+        rewardTimeline     = rewardTimeline_;
+        popReward          = popReward_;
+        maxPeriodRewards   = maxPeriodRewards_;
+        rewardStartTime    = rewardStartTime_;
 
         emit ModifyParameters("accountingEngine", accountingEngine_);
         emit ModifyParameters("treasury", treasury_);
         emit ModifyParameters("interPeriodDelay", interPeriodDelay);
         emit ModifyParameters("rewardTimeline", rewardTimeline);
         emit ModifyParameters("popReward", popReward);
+        emit ModifyParameters("rewardStartTime", rewardStartTime);
         emit ModifyParameters("maxPeriodRewards", maxPeriodRewards);
 
         emit SetRewardPeriodStart(rewardPeriodStart);
@@ -161,6 +168,7 @@ contract DebtPopperRewards {
     }
 
     function getRewardForPop(uint256 slotTimestamp, address feeReceiver) external {
+        require(slotTimestamp >= rewardStartTime, "DebtPopperRewards/slot-time-before-reward-start");
         require(now >= rewardPeriodStart, "DebtPopperRewards/wait-more");
         require(addition(slotTimestamp, rewardTimeline) >= now, "DebtPopperRewards/missed-reward-window");
         require(accountingEngine.debtPoppers(slotTimestamp) == msg.sender, "DebtPopperRewards/not-debt-popper");
