@@ -131,6 +131,10 @@ contract DebtPopperRewards {
           require(val % popReward == 0, "DebtPopperRewards/invalid-max-period-rewards");
           maxPeriodRewards = val;
         }
+        else if (parameter == "rewardPeriodStart") {
+          require(val > now, "DebtPopperRewards/invalid-reward-period-start");
+          rewardPeriodStart = val;
+        }
         else revert("DebtPopperRewards/modify-unrecognized-param");
         emit ModifyParameters(parameter, val);
     }
@@ -159,33 +163,34 @@ contract DebtPopperRewards {
     function getCallerReward() public view returns (uint256 reward) {
         reward = minimum(popReward, treasuryAllowance() / RAY);
     }
-    function rewardCaller(address proposedFeeReceiver, uint256 reward) internal {
-        require(address(treasury) == proposedFeeReceiver, "DebtPopperRewards/reward-receiver-cannot-be-treasury");
-        require(both(address(treasury) != address(0), reward > 0), "DebtPopperRewards/invalid-treasury-or-reward");
+    function rewardCaller(address proposedFeeReceiver) internal {
+        require(address(treasury) != proposedFeeReceiver, "DebtPopperRewards/reward-receiver-cannot-be-treasury");
+        require(both(address(treasury) != address(0), popReward > 0), "DebtPopperRewards/invalid-treasury-or-reward");
         address finalFeeReceiver = (proposedFeeReceiver == address(0)) ? msg.sender : proposedFeeReceiver;
-        treasury.pullFunds(finalFeeReceiver, treasury.systemCoin(), reward);
-        emit RewardCaller(finalFeeReceiver, reward);
+        treasury.pullFunds(finalFeeReceiver, treasury.systemCoin(), popReward);
+        emit RewardCaller(finalFeeReceiver, popReward);
     }
 
     function getRewardForPop(uint256 slotTimestamp, address feeReceiver) external {
         require(slotTimestamp >= rewardStartTime, "DebtPopperRewards/slot-time-before-reward-start");
+        require(slotTimestamp < now, "DebtPopperRewards/slot-cannot-be-in-the-future");
         require(now >= rewardPeriodStart, "DebtPopperRewards/wait-more");
         require(addition(slotTimestamp, rewardTimeline) >= now, "DebtPopperRewards/missed-reward-window");
         require(accountingEngine.debtPoppers(slotTimestamp) == msg.sender, "DebtPopperRewards/not-debt-popper");
         require(!rewardedPop[slotTimestamp], "DebtPopperRewards/pop-already-rewarded");
+        require(getCallerReward() >= popReward, "DebtPopperRewards/invalid-available-reward");
 
         rewardedPop[slotTimestamp]          = true;
-        uint256 reward                      = getCallerReward();
-        rewardsPerPeriod[rewardPeriodStart] = addition(rewardsPerPeriod[rewardPeriodStart], reward);
+        rewardsPerPeriod[rewardPeriodStart] = addition(rewardsPerPeriod[rewardPeriodStart], popReward);
 
         if (rewardsPerPeriod[rewardPeriodStart] >= maxPeriodRewards) {
-          rewardPeriodStart = addition(rewardPeriodStart, interPeriodDelay);
+          rewardPeriodStart = addition(now, interPeriodDelay);
           emit SetRewardPeriodStart(rewardPeriodStart);
         }
 
-        emit RewardForPop(slotTimestamp, reward);
+        emit RewardForPop(slotTimestamp, popReward);
 
         // Give the reward
-        rewardCaller(feeReceiver, reward);
+        rewardCaller(feeReceiver);
     }
 }
