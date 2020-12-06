@@ -169,4 +169,15 @@ contract DebtPopperRewardsTest is DSTest {
         assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), 0);
         assertTrue(popperRewards.rewardPeriodStart() > now);
     }
+    function testFail_getReward_after_disable() public {
+        popperRewards.disableContract();
+        popperRewards.modifyParameters("maxPeriodRewards", popReward);
+
+        hevm.warp(now + 2 weeks + 1);
+        uint slotTime = now;
+        accountingEngine.popDebt(slotTime);
+
+        hevm.warp(now + 1);
+        popperRewards.getRewardForPop(slotTime, address(0x123));
+    }
 }

@@ -48,6 +48,8 @@ contract DebtPopperRewards {
     uint256 public popReward;                            // [wad]
     // Timestamp from which the contract accepts requests to reward poppers
     uint256 public rewardStartTime;
+    // Flag indicating whether the contract is active
+    uint256 public contractEnabled;
 
     // Whether a debt block has been popped
     mapping(uint256 => bool) public rewardedPop;         // [unix timestamp => bool]
@@ -65,6 +67,7 @@ contract DebtPopperRewards {
     event RemoveAuthorization(address account);
     event RewardCaller(address feeReceiver, uint256 amount);
     event RewardForPop(uint256 slotTimestamp, uint256 reward);
+    event DisableContract();
 
     constructor(
         address accountingEngine_,
@@ -84,6 +87,7 @@ contract DebtPopperRewards {
         require(accountingEngine_ != address(0), "DebtPopperRewards/null-accounting-engine");
 
         authorizedAccounts[msg.sender] = 1;
+        contractEnabled                = 1;
 
         accountingEngine   = AccountingEngineLike(accountingEngine_);
         treasury           = StabilityFeeTreasuryLike(treasury_);
@@ -145,6 +149,11 @@ contract DebtPopperRewards {
         emit ModifyParameters(parameter, addr);
     }
 
+    function disableContract() external isAuthorized {
+        contractEnabled = 0;
+        emit DisableContract();
+    }
+
     // --- Math ---
     uint internal constant WAD      = 10 ** 18;
     uint internal constant RAY      = 10 ** 27;
@@ -172,6 +181,7 @@ contract DebtPopperRewards {
     }
 
     function getRewardForPop(uint256 slotTimestamp, address feeReceiver) external {
+        require(contractEnabled == 1, "DebtPopperRewards/contract-disabled");
         require(slotTimestamp >= rewardStartTime, "DebtPopperRewards/slot-time-before-reward-start");
         require(slotTimestamp < now, "DebtPopperRewards/slot-cannot-be-in-the-future");
         require(now >= rewardPeriodStart, "DebtPopperRewards/wait-more");
