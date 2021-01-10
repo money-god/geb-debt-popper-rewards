@@ -33,7 +33,7 @@ contract DebtPopperRewardsTest is DSTest {
 
     DSToken systemCoin;
 
-    uint256 popReward         = 5E18;
+    uint256 fixedReward         = 5E18;
     uint256 coinsToMint       = 1E40;
     uint256 interPeriodDelay  = 1 weeks;
     uint256 rewardTimeline    = 100 days;
@@ -55,7 +55,7 @@ contract DebtPopperRewardsTest is DSTest {
             now + 2 weeks,
             interPeriodDelay,
             rewardTimeline,
-            popReward,
+            fixedReward,
             maxPeriodRewards,
             now + 1 weeks
         );
@@ -64,7 +64,7 @@ contract DebtPopperRewardsTest is DSTest {
         systemCoin.mint(address(treasury), coinsToMint);
 
         treasury.setTotalAllowance(address(popperRewards), uint(-1));
-        treasury.setPerBlockAllowance(address(popperRewards), popReward * 10E27);
+        treasury.setPerBlockAllowance(address(popperRewards), fixedReward * 10E27);
     }
 
     function test_setup() public {
@@ -74,7 +74,7 @@ contract DebtPopperRewardsTest is DSTest {
         assertEq(popperRewards.rewardPeriodStart(), now + 2 weeks);
         assertEq(popperRewards.interPeriodDelay(), interPeriodDelay);
         assertEq(popperRewards.rewardTimeline(), rewardTimeline);
-        assertEq(popperRewards.popReward(), popReward);
+        assertEq(popperRewards.fixedReward(), fixedReward);
         assertEq(popperRewards.maxPeriodRewards(), maxPeriodRewards);
         assertEq(popperRewards.rewardStartTime(), now + 1 weeks);
     }
@@ -116,7 +116,7 @@ contract DebtPopperRewardsTest is DSTest {
         popperRewards.getRewardForPop(slotTime, address(0x123));
     }
     function testFail_get_reward_above_max_period_rewards() public {
-        popperRewards.modifyParameters("maxPeriodRewards", popReward);
+        popperRewards.modifyParameters("maxPeriodRewards", fixedReward);
         hevm.warp(now + 2 weeks + 1);
         uint slotTime = now;
         accountingEngine.popDebt(slotTime);
@@ -148,12 +148,12 @@ contract DebtPopperRewardsTest is DSTest {
         hevm.warp(now + 1);
         popperRewards.getRewardForPop(slotTime, address(0x123));
 
-        assertEq(systemCoin.balanceOf(address(0x123)), popReward);
+        assertEq(systemCoin.balanceOf(address(0x123)), fixedReward);
         assertTrue(popperRewards.rewardedPop(slotTime));
-        assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), popReward);
+        assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), fixedReward);
     }
     function test_getRewardForPop_after_rewardPeriodStart_updated() public {
-        popperRewards.modifyParameters("maxPeriodRewards", popReward);
+        popperRewards.modifyParameters("maxPeriodRewards", fixedReward);
         hevm.warp(now + 2 weeks + 1);
         uint slotTime = now;
         accountingEngine.popDebt(slotTime);
@@ -163,7 +163,7 @@ contract DebtPopperRewardsTest is DSTest {
         hevm.warp(popperRewards.rewardPeriodStart());
         popperRewards.getRewardForPop(slotTime + 15, address(0x123));
 
-        assertEq(systemCoin.balanceOf(address(0x123)), popReward * 2);
+        assertEq(systemCoin.balanceOf(address(0x123)), fixedReward * 2);
         assertTrue(popperRewards.rewardedPop(slotTime));
         assertTrue(popperRewards.rewardedPop(slotTime + 15));
         assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), 0);
@@ -171,7 +171,7 @@ contract DebtPopperRewardsTest is DSTest {
     }
     function testFail_getReward_after_disable() public {
         popperRewards.disableContract();
-        popperRewards.modifyParameters("maxPeriodRewards", popReward);
+        popperRewards.modifyParameters("maxPeriodRewards", fixedReward);
 
         hevm.warp(now + 2 weeks + 1);
         uint slotTime = now;
