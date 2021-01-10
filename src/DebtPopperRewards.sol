@@ -1,41 +1,11 @@
-pragma solidity ^0.6.7;
+pragma solidity 0.6.7;
 
 abstract contract AccountingEngineLike {
     function debtPoppers(uint256) virtual public view returns (address);
 }
-abstract contract StabilityFeeTreasuryLike {
-    function getAllowance(address) virtual external view returns (uint, uint);
-    function systemCoin() virtual external view returns (address);
-    function pullFunds(address, address, uint) virtual external;
-}
 
 contract DebtPopperRewards {
-    // --- Auth ---
-    mapping (address => uint) public authorizedAccounts;
-    /**
-     * @notice Add auth to an account
-     * @param account Account to add auth to
-     */
-    function addAuthorization(address account) external isAuthorized {
-        authorizedAccounts[account] = 1;
-        emit AddAuthorization(account);
-    }
-    /**
-     * @notice Remove auth from an account
-     * @param account Account to remove auth from
-     */
-    function removeAuthorization(address account) external isAuthorized {
-        authorizedAccounts[account] = 0;
-        emit RemoveAuthorization(account);
-    }
-    /**
-    * @notice Checks whether msg.sender can call an authed function
-    **/
-    modifier isAuthorized {
-        require(authorizedAccounts[msg.sender] == 1, "DebtPopperRewards/account-not-authorized");
-        _;
-    }
-
+    // --- Variables ---
     // When the next reward period starts
     uint256 public rewardPeriodStart;                    // [unix timestamp]
     // Delay between two consecutive reward periods
@@ -44,28 +14,20 @@ contract DebtPopperRewards {
     uint256 public rewardTimeline;                       // [seconds]
     // Total amount of rewards that can be distributed per period
     uint256 public maxPeriodRewards;                     // [wad]
-    // Reward for popping one slot
-    uint256 public popReward;                            // [wad]
     // Timestamp from which the contract accepts requests to reward poppers
     uint256 public rewardStartTime;
     // Flag indicating whether the contract is active
     uint256 public contractEnabled;
 
     // Whether a debt block has been popped
-    mapping(uint256 => bool) public rewardedPop;         // [unix timestamp => bool]
+    mapping(uint256 => bool)    public rewardedPop;         // [unix timestamp => bool]
     // Amount of rewards given in a period
     mapping(uint256 => uint256) public rewardsPerPeriod; // [unix timestamp => wad]
 
-    AccountingEngineLike     public accountingEngine;
-    StabilityFeeTreasuryLike public treasury;
+    AccountingEngineLike        public accountingEngine;
 
     // --- Events ---
     event SetRewardPeriodStart(uint256 rewardPeriodStart);
-    event ModifyParameters(bytes32 parameter, address addr);
-    event ModifyParameters(bytes32 parameter, uint256 data);
-    event AddAuthorization(address account);
-    event RemoveAuthorization(address account);
-    event RewardCaller(address feeReceiver, uint256 amount);
     event RewardForPop(uint256 slotTimestamp, uint256 reward);
     event DisableContract();
 
