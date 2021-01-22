@@ -68,11 +68,6 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
         emit SetRewardPeriodStart(rewardPeriodStart);
     }
 
-    // --- Boolean Logic ---
-    function either(bool x, bool y) internal pure returns (bool z) {
-        assembly{ z := or(x, y)}
-    }
-
     // --- Administration ---
     function modifyParameters(bytes32 parameter, uint256 val) external isAuthorized {
         require(val > 0, "DebtPopperRewards/invalid-value");
