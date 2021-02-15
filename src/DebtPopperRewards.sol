@@ -69,6 +69,11 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
     }
 
     // --- Administration ---
+    /*
+    * @notify Modify a uint256 parameter
+    * @param parameter The parameter name
+    * @param val The new value for the parameter
+    */
     function modifyParameters(bytes32 parameter, uint256 val) external isAuthorized {
         require(val > 0, "DebtPopperRewards/invalid-value");
         if (parameter == "interPeriodDelay") {
@@ -92,6 +97,11 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
         else revert("DebtPopperRewards/modify-unrecognized-param");
         emit ModifyParameters(parameter, val);
     }
+    /*
+    * @notify Set a new treasury address
+    * @param parameter The parameter name
+    * @param addr The new address for the parameter
+    */
     function modifyParameters(bytes32 parameter, address addr) external isAuthorized {
         require(addr != address(0), "DebtPopperRewards/null-address");
         if (parameter == "treasury") treasury = StabilityFeeTreasuryLike(addr);
@@ -99,11 +109,19 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
         emit ModifyParameters(parameter, addr);
     }
 
+    /*
+    * @notify Disable this contract and forbid getRewardForPop calls
+    */
     function disableContract() external isAuthorized {
         contractEnabled = 0;
         emit DisableContract();
     }
 
+    /*
+    * @notify Get rewarded for popping a debt slot from the AccountingEngine debt queue
+    * @oaran slotTimestamp The time of the popped slot
+    * @param feeReceiver The address that will receive the reward for popping
+    */
     function getRewardForPop(uint256 slotTimestamp, address feeReceiver) external {
         require(contractEnabled == 1, "DebtPopperRewards/contract-disabled");
         require(slotTimestamp >= rewardStartTime, "DebtPopperRewards/slot-time-before-reward-start");
