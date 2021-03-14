@@ -1,6 +1,6 @@
 pragma solidity 0.6.7;
 
-import "geb-treasury-reimbursement/MandatoryFixedTreasuryReimbursement.sol";
+import "geb-treasury-reimbursement/reimbursement/MandatoryFixedTreasuryReimbursement.sol";
 
 abstract contract AccountingEngineLike {
     function debtPoppers(uint256) virtual public view returns (address);
@@ -14,24 +14,22 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
     uint256 public interPeriodDelay;                     // [seconds]
     // Time (after a block of debt is popped) after which no reward can be given anymore
     uint256 public rewardTimeline;                       // [seconds]
-    // Total amount of rewards that can be distributed per period
-    uint256 public maxPeriodRewards;                     // [wad]
-    // Timestamp from which the contract accepts requests to reward poppers
+    // Amount of pops that can be rewarded per period
+    uint256 public maxPerPeriodPops;
+    // Timestamp from which the contract accepts requests for rewarding debt poppers
     uint256 public rewardStartTime;
-    // Flag indicating whether the contract is active
-    uint256 public contractEnabled;
 
     // Whether a debt block has been popped
-    mapping(uint256 => bool)    public rewardedPop;         // [unix timestamp => bool]
-    // Amount of rewards given in a period
+    mapping(uint256 => bool)    public rewardedPop;      // [unix timestamp => bool]
+    // Amount of pops that were rewarded in each period
     mapping(uint256 => uint256) public rewardsPerPeriod; // [unix timestamp => wad]
 
+    // Accounting engine contract
     AccountingEngineLike        public accountingEngine;
 
     // --- Events ---
     event SetRewardPeriodStart(uint256 rewardPeriodStart);
     event RewardForPop(uint256 slotTimestamp, uint256 reward);
-    event DisableContract();
 
     constructor(
         address accountingEngine_,
@@ -40,30 +38,29 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
         uint256 interPeriodDelay_,
         uint256 rewardTimeline_,
         uint256 fixedReward_,
-        uint256 maxPeriodRewards_,
+        uint256 maxPerPeriodPops_,
         uint256 rewardStartTime_
     ) public MandatoryFixedTreasuryReimbursement(treasury_, fixedReward_) {
         require(rewardPeriodStart_ >= now, "DebtPopperRewards/invalid-reward-period-start");
         require(interPeriodDelay_ > 0, "DebtPopperRewards/invalid-inter-period-delay");
         require(rewardTimeline_ > 0, "DebtPopperRewards/invalid-harvest-timeline");
-        require(both(maxPeriodRewards_ > 0, maxPeriodRewards_ % fixedReward_ == 0), "DebtPopperRewards/invalid-max-period-rewards");
+        require(maxPerPeriodPops_ > 0, "DebtPopperRewards/invalid-max-per-period-pops");
         require(accountingEngine_ != address(0), "DebtPopperRewards/null-accounting-engine");
 
-        contractEnabled    = 1;
         accountingEngine   = AccountingEngineLike(accountingEngine_);
 
         rewardPeriodStart  = rewardPeriodStart_;
         interPeriodDelay   = interPeriodDelay_;
         rewardTimeline     = rewardTimeline_;
         fixedReward        = fixedReward_;
-        maxPeriodRewards   = maxPeriodRewards_;
+        maxPerPeriodPops   = maxPerPeriodPops_;
         rewardStartTime    = rewardStartTime_;
 
         emit ModifyParameters("accountingEngine", accountingEngine_);
         emit ModifyParameters("interPeriodDelay", interPeriodDelay);
         emit ModifyParameters("rewardTimeline", rewardTimeline);
         emit ModifyParameters("rewardStartTime", rewardStartTime);
-        emit ModifyParameters("maxPeriodRewards", maxPeriodRewards);
+        emit ModifyParameters("maxPerPeriodPops", maxPerPeriodPops);
 
         emit SetRewardPeriodStart(rewardPeriodStart);
     }
@@ -83,12 +80,11 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
           rewardTimeline = val;
         }
         else if (parameter == "fixedReward") {
-          require(maxPeriodRewards % val == 0, "DebtPopperRewards/invalid-fixed-reward");
+          require(val > 0, "DebtPopperRewards/null-reward");
           fixedReward = val;
         }
-        else if (parameter == "maxPeriodRewards") {
-          require(val % fixedReward == 0, "DebtPopperRewards/invalid-max-period-rewards");
-          maxPeriodRewards = val;
+        else if (parameter == "maxPerPeriodPops") {
+          maxPerPeriodPops = val;
         }
         else if (parameter == "rewardPeriodStart") {
           require(val > now, "DebtPopperRewards/invalid-reward-period-start");
@@ -110,20 +106,12 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
     }
 
     /*
-    * @notify Disable this contract and forbid getRewardForPop calls
-    */
-    function disableContract() external isAuthorized {
-        contractEnabled = 0;
-        emit DisableContract();
-    }
-
-    /*
     * @notify Get rewarded for popping a debt slot from the AccountingEngine debt queue
     * @oaran slotTimestamp The time of the popped slot
     * @param feeReceiver The address that will receive the reward for popping
     */
     function getRewardForPop(uint256 slotTimestamp, address feeReceiver) external {
-        require(contractEnabled == 1, "DebtPopperRewards/contract-disabled");
+        // Perform checks
         require(slotTimestamp >= rewardStartTime, "DebtPopperRewards/slot-time-before-reward-start");
         require(slotTimestamp < now, "DebtPopperRewards/slot-cannot-be-in-the-future");
         require(now >= rewardPeriodStart, "DebtPopperRewards/wait-more");
@@ -132,10 +120,12 @@ contract DebtPopperRewards is MandatoryFixedTreasuryReimbursement {
         require(!rewardedPop[slotTimestamp], "DebtPopperRewards/pop-already-rewarded");
         require(getCallerReward() >= fixedReward, "DebtPopperRewards/invalid-available-reward");
 
+        // Update state
         rewardedPop[slotTimestamp]          = true;
-        rewardsPerPeriod[rewardPeriodStart] = addition(rewardsPerPeriod[rewardPeriodStart], fixedReward);
+        rewardsPerPeriod[rewardPeriodStart] = addition(rewardsPerPeriod[rewardPeriodStart], 1);
 
-        if (rewardsPerPeriod[rewardPeriodStart] >= maxPeriodRewards) {
+        // If we offered rewards for too many pops, enforce a delay since rewards are available again
+        if (rewardsPerPeriod[rewardPeriodStart] >= maxPerPeriodPops) {
           rewardPeriodStart = addition(now, interPeriodDelay);
           emit SetRewardPeriodStart(rewardPeriodStart);
         }
