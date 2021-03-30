@@ -73,7 +73,6 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         bytes32      tag;  assembly { tag := extcodehash(usr) }
         bytes memory fax = abi.encodeWithSignature("addAuthorization(address,address)", address(stabilityFeeTreasury), address(this));
         uint         eta = now;
-
         pause.scheduleTransaction(usr, tag, fax, eta);
         pause.executeTransaction(usr, tag, fax, eta);
 
@@ -136,6 +135,19 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         hevm.warp(now + 1);
         popperRewards.getRewardForPop(slotTime, address(0x123));
     }
+    function testFail_get_reward_above_max_period_rewards() public {
+        popperRewards.modifyParameters("maxPeriodRewards", fixedReward);
+        hevm.warp(now + 2 weeks + 1);
+        uint slotTime = now;
+        accountingEngine.pushDebtToQueue(100 ether);
+        accountingEngine.popDebtFromQueue(slotTime);
+        hevm.warp(now+15);
+        accountingEngine.pushDebtToQueue(100 ether);
+        accountingEngine.popDebtFromQueue(slotTime + 15);
+        hevm.warp(now + 1);
+        popperRewards.getRewardForPop(slotTime, address(0x123));
+        popperRewards.getRewardForPop(slotTime + 15, address(0x123));
+    }
     function testFail_get_reward_when_total_allowance_zero() public {
         stabilityFeeTreasury.setTotalAllowance(address(popperRewards), 0);
         hevm.warp(now + 2 weeks + 1);
@@ -166,7 +178,6 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         assertTrue(popperRewards.rewardedPop(slotTime));
         assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), fixedReward);
     }
-
     function test_getRewardForPop_gas() public {
         hevm.warp(now + 2 weeks + 1);
         accountingEngine.pushDebtToQueue(100 ether);
@@ -174,7 +185,6 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         hevm.warp(now + 1);
         popperRewards.getRewardForPop(now - 1, address(this));
     }
-
     function test_getRewardForPop_gas_multiple() public {
         hevm.warp(now + 2 weeks + 1);
         accountingEngine.pushDebtToQueue(100 ether);
