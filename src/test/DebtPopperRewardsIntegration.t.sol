@@ -32,14 +32,10 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
 
     uint RAY = 10 ** 27;
 
-    function addAuthorization(address dst, address who) public {
-        DebtPopperRewards(dst).addAuthorization(who);
-    }
-
     function setUp() override public {
         super.setUp();
 
-        deployIndexWithCreatorPermissions(bytes32("ENGLISH"));
+        deployIndexWithCreatorPermissions(bytes32("FIXED-DISCOUNT"));
 
         popperRewards    = new DebtPopperRewards(
             address(accountingEngine),
@@ -69,7 +65,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         coinJoin.exit(address(stabilityFeeTreasury), 1000 ether);
 
         // auth in stabilityFeeTreasury
-        address      usr = address(this);
+        address      usr = address(govActions);
         bytes32      tag;  assembly { tag := extcodehash(usr) }
         bytes memory fax = abi.encodeWithSignature("addAuthorization(address,address)", address(stabilityFeeTreasury), address(this));
         uint         eta = now;
@@ -174,7 +170,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         hevm.warp(now + 1);
         popperRewards.getRewardForPop(slotTime, address(0x123));
 
-        assertEq(safeEngine.coinBalance(address(0x123)), fixedReward * 10**27);
+        assertEq(safeEngine.coinBalance(address(0x123)), fixedReward * RAY);
         assertTrue(popperRewards.rewardedPop(slotTime));
         assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), fixedReward);
     }
@@ -200,7 +196,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
             hevm.warp(now + 1);
         }
     }
-    function test_getRewardForPop_after_rewardPeriodStart_updated2() public {
+    function test_getRewardForPop_after_rewardPeriodStart_updated() public {
         popperRewards.modifyParameters("maxPeriodRewards", fixedReward);
         hevm.warp(now + 2 weeks + 1);
         uint slotTime = now;
@@ -214,7 +210,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         hevm.warp(popperRewards.rewardPeriodStart());
         popperRewards.getRewardForPop(slotTime + 15, address(0x123));
 
-        assertEq(safeEngine.coinBalance(address(0x123)), fixedReward * 2 * 10**27);
+        assertEq(safeEngine.coinBalance(address(0x123)), fixedReward * 2 * RAY);
         assertTrue(popperRewards.rewardedPop(slotTime));
         assertTrue(popperRewards.rewardedPop(slotTime + 15));
         assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), 0);
