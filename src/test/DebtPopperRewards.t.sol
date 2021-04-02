@@ -152,6 +152,27 @@ contract DebtPopperRewardsTest is DSTest {
         assertTrue(popperRewards.rewardedPop(slotTime));
         assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), 1);
     }
+
+    function test_getRewardForPop_gas() public {
+        hevm.warp(now + 2 weeks + 1);
+        accountingEngine.popDebt(now);
+        hevm.warp(now + 1);
+        popperRewards.getRewardForPop(now - 1, address(this));
+    }
+
+    function test_getRewardForPop_gas_multiple() public {
+        hevm.warp(now + 2 weeks + 1);
+        accountingEngine.popDebt(now);
+        hevm.warp(now + 1);
+        uint gas;
+        for (uint i = 0; i < 10; i++) {
+            gas = gasleft();
+            popperRewards.getRewardForPop(now - 1, address(this));
+            emit log_named_uint("gas", gas -gasleft());
+            accountingEngine.popDebt(now);
+            hevm.warp(now + 1);
+        }
+    }
     function test_getRewardForPop_after_rewardPeriodStart_updated() public {
         popperRewards.modifyParameters("maxPerPeriodPops", 1);
         hevm.warp(now + 2 weeks + 1);
