@@ -163,6 +163,7 @@ contract DebtPopperRewardsTest is DSTest {
     function test_getRewardForPop_gas_multiple() public {
         hevm.warp(now + 2 weeks + 1);
         accountingEngine.popDebt(now);
+        popperRewards.modifyParameters("maxPerPeriodPops", 10);
         hevm.warp(now + 1);
         uint gas;
         for (uint i = 0; i < 10; i++) {
