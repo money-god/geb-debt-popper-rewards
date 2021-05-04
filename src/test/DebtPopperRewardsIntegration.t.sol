@@ -28,7 +28,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
     uint256 coinsToMint       = 1E40;
     uint256 interPeriodDelay  = 1 weeks;
     uint256 rewardTimeline    = 100 days;
-    uint256 maxPeriodRewards  = 50E18;
+    uint256 maxPerPeriodPops  = 10;
 
     uint RAY = 10 ** 27;
 
@@ -44,7 +44,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
             interPeriodDelay,
             rewardTimeline,
             fixedReward,
-            maxPeriodRewards,
+            maxPerPeriodPops,
             now + 1 weeks
         );
         attacker         = new Attacker();
@@ -85,7 +85,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         assertEq(popperRewards.interPeriodDelay(), interPeriodDelay);
         assertEq(popperRewards.rewardTimeline(), rewardTimeline);
         assertEq(popperRewards.fixedReward(), fixedReward);
-        assertEq(popperRewards.maxPeriodRewards(), maxPeriodRewards);
+        assertEq(popperRewards.maxPerPeriodPops(), maxPerPeriodPops);
         assertEq(popperRewards.rewardStartTime(), now + 1 weeks);
     }
     function testFail_get_reward_before_rewardStartTime() public {
@@ -172,7 +172,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
 
         assertEq(safeEngine.coinBalance(address(0x123)), fixedReward * RAY);
         assertTrue(popperRewards.rewardedPop(slotTime));
-        assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), fixedReward);
+        assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), 1);
     }
     function test_getRewardForPop_gas() public {
         hevm.warp(now + 2 weeks + 1);
@@ -197,7 +197,7 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         }
     }
     function test_getRewardForPop_after_rewardPeriodStart_updated() public {
-        popperRewards.modifyParameters("maxPeriodRewards", fixedReward);
+        popperRewards.modifyParameters("maxPerPeriodPops", 1);
         hevm.warp(now + 2 weeks + 1);
         uint slotTime = now;
         accountingEngine.pushDebtToQueue(100 ether);
@@ -215,17 +215,5 @@ contract DebtPopperRewardsIntegrationTest is GebDeployTestBase {
         assertTrue(popperRewards.rewardedPop(slotTime + 15));
         assertEq(popperRewards.rewardsPerPeriod(popperRewards.rewardPeriodStart()), 0);
         assertTrue(popperRewards.rewardPeriodStart() > now);
-    }
-    function testFail_getReward_after_disable() public {
-        popperRewards.disableContract();
-        popperRewards.modifyParameters("maxPeriodRewards", fixedReward);
-
-        hevm.warp(now + 2 weeks + 1);
-        uint slotTime = now;
-        accountingEngine.pushDebtToQueue(100 ether);
-        accountingEngine.popDebtFromQueue(slotTime);
-
-        hevm.warp(now + 1);
-        popperRewards.getRewardForPop(slotTime, address(0x123));
     }
 }
