@@ -1,6 +1,6 @@
 pragma solidity 0.6.7;
 
-import "geb-treasury-reimbursement/reimbursement/MandatoryFixedTreasuryReimbursement.sol";
+import "geb-treasury-reimbursement/reimbursement/single/MandatoryFixedTreasuryReimbursement.sol";
 
 abstract contract AccountingEngineLike {
     function debtPoppers(uint256) virtual public view returns (address);
